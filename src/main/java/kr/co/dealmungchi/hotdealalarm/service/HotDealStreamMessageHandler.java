@@ -47,9 +47,8 @@ public class HotDealStreamMessageHandler implements StreamMessageHandler {
             // Critical fix: Wait for each alarm to be processed before moving to the next
             // This ensures each sendAlarm operation is subscribed to and executed
             .flatMap(dto -> {
-                log.info("Processing hot deal: {} from message {}", dto.title(), messageId);
                 return alarmService.sendAlarm(dto)
-                    .doOnSuccess(v -> log.info("Successfully sent alarm for: {}", dto.title()))
+                    .doOnSuccess(v -> log.debug("Successfully sent alarm for: {}", dto.title()))
                     .doOnError(e -> log.error("Failed to send alarm for: {}", dto.title(), e))
                     .onErrorResume(e -> Mono.empty()); // Continue with next item even if one fails
             })

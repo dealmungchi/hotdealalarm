@@ -18,7 +18,6 @@ import reactor.core.scheduler.Schedulers;
 import jakarta.annotation.PreDestroy;
 import okhttp3.OkHttpClient;
 import java.time.Instant;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -73,9 +72,7 @@ public class DiscordAlarmService implements AlarmService {
             // Force immediate execution on a background thread
             Schedulers.boundedElastic().schedule(() -> {
                 try {
-                    log.info("Discord alarm execution started for: {}", hotDeal.title());
                     sendWithRetry(embed, hotDeal.title(), 0);
-                    log.info("Discord alarm execution completed for: {}", hotDeal.title());
                 } catch (Exception e) {
                     log.error("Discord alarm execution failed: {}", e.getMessage(), e);
                 }
@@ -99,12 +96,7 @@ public class DiscordAlarmService implements AlarmService {
             log.debug("Attempting to send Discord message for '{}' (attempt {}/{})", 
                     title, attemptCount + 1, retryAttempts);
                     
-            // Get the future and explicitly wait for completion
-            CompletableFuture<ReadonlyMessage> future = webhookClient.send(message);
-            long messageId = future.join().getId();
-            
-            log.info("Discord message sent successfully for deal: '{}', message ID: {}", 
-                    title, messageId);
+            webhookClient.send(message);
         } catch (Exception e) {
             log.error("Error sending Discord message (attempt {}/{}): {} - {}", 
                     attemptCount + 1, retryAttempts, e.getClass().getName(), e.getMessage(), e);

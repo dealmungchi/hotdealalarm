@@ -1,0 +1,41 @@
+server:
+  port: ${SERVER_PORT:9080}
+
+spring:
+  main:
+    web-application-type: reactive
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      timeout: ${REDIS_TIMEOUT:10000}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:10000}
+
+alarm:
+  discord:
+    webhook-url: ${DISCORD_WEBHOOK_URL}
+    retry-attempts: ${DISCORD_RETRY_ATTEMPTS:3}
+    retry-delay-ms: ${DISCORD_RETRY_DELAY_MS:1000}
+    timeout-ms: ${DISCORD_TIMEOUT_MS:5000}
+
+redis:
+  stream:
+    new-hotdeals:
+      key: ${REDIS_STREAM_NEW_HOTDEALS_KEY}
+      partitions: ${REDIS_STREAM_NEW_HOTDEALS_PARTITIONS:1}
+    consumer-group: ${REDIS_STREAM_CONSUMER_GROUP}
+    consumer-name: ${REDIS_STREAM_CONSUMER_NAME}
+    message-processing-timeout: ${REDIS_STREAM_MESSAGE_PROCESSING_TIMEOUT:15000}
+
+logging:
+  level:
+    kr.co.dealmungchi.hotdealalarm: DEBUG
+    org.springframework.data.redis: INFO
+    io.lettuce.core: WARN
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+    file: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+  file:
+    name: logs/hotdealalarm.log
+    max-size: 10MB
+    max-history: 10

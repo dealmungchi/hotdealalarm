@@ -1,0 +1,49 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.4.4'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'kr.co.dealmungchi'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs.add('-parameters')
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter'
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
+	implementation 'io.netty:netty-resolver-dns-native-macos:4.1.97.Final:osx-aarch_64'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+	// Discord Webhook
+	implementation 'club.minnced:discord-webhooks:0.8.4'
+
+	// .env file support
+	implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
+	// Lombok
+	compileOnly 'org.projectlombok:lombok:1.18.34'
+	annotationProcessor 'org.projectlombok:lombok:1.18.34'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'io.projectreactor:reactor-test'
+	testImplementation 'org.mockito:mockito-junit-jupiter:5.10.0'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}

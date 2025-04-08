@@ -2,8 +2,7 @@
 
 A reactive microservice that consumes hot deal messages from Redis streams and sends notifications to Discord via webhooks.
 
-![image](https://github.com/user-attachments/assets/1179787e-303f-4dd8-9f59-b2871b205c65)
-
+<img src="https://github.com/user-attachments/assets/1179787e-303f-4dd8-9f59-b2871b205c65" width="600" height="700" />
 
 ## Features
 

@@ -17,6 +17,9 @@ alarm:
     retry-attempts: ${DISCORD_RETRY_ATTEMPTS:3}
     retry-delay-ms: ${DISCORD_RETRY_DELAY_MS:1000}
     timeout-ms: ${DISCORD_TIMEOUT_MS:5000}
+    rate-limit:
+      delay-ms: ${DISCORD_RATE_LIMIT_DELAY_MS:500}
+      burst-size: ${DISCORD_RATE_LIMIT_BURST_SIZE:5}
 
 redis:
   stream:

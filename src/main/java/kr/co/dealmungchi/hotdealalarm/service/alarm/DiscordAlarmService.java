@@ -14,10 +14,15 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import okhttp3.OkHttpClient;
 import java.time.Instant;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -25,7 +30,14 @@ public class DiscordAlarmService implements AlarmService {
     private final WebhookClient webhookClient;
     private final int retryAttempts;
     private final int retryDelayMs;
-
+    private final int rateLimitDelayMs;
+    private final int rateLimitBurstSize;
+    
+    // Rate limiting implementation
+    private final Queue<WebhookTask> messageQueue = new ConcurrentLinkedQueue<>();
+    private final Semaphore rateLimitSemaphore;
+    private final AtomicBoolean processingQueue = new AtomicBoolean(false);
+    
     public DiscordAlarmService(AlarmConfig alarmConfig) {
         log.info("Initializing Discord alarm service with webhook URL: {}", maskUrl(alarmConfig.getDiscordWebhookUrl()));
         
@@ -43,6 +55,17 @@ public class DiscordAlarmService implements AlarmService {
         
         this.retryAttempts = alarmConfig.getDiscordRetryAttempts();
         this.retryDelayMs = alarmConfig.getDiscordRetryDelayMs();
+        this.rateLimitDelayMs = alarmConfig.getDiscordRateLimitDelayMs();
+        this.rateLimitBurstSize = alarmConfig.getDiscordRateLimitBurstSize();
+        this.rateLimitSemaphore = new Semaphore(rateLimitBurstSize);
+        
+        log.info("Initialized Discord alarm service with rate limit settings: delay={}ms, burstSize={}", 
+                rateLimitDelayMs, rateLimitBurstSize);
+    }
+    
+    @PostConstruct
+    public void init() {
+        log.info("Starting Discord message queue processor thread");
     }
     
     @PreDestroy
@@ -60,41 +83,72 @@ public class DiscordAlarmService implements AlarmService {
             return Mono.empty();
         }
         
-        log.debug("Sending Discord alarm for deal: {}", hotDeal.title());
+        log.debug("Queuing Discord alarm for deal: {}", hotDeal.title());
         
         // Create the embed outside the reactive chain
         WebhookEmbed embed = createEmbed(hotDeal);
+        WebhookMessage message = new WebhookMessageBuilder()
+            .addEmbeds(embed)
+            .build();
         
-        // Execute directly without relying on subscriber
-        try {
-            // Force immediate execution on a background thread
-            Schedulers.boundedElastic().schedule(() -> {
-                try {
-                    sendWithRetry(embed, hotDeal.title(), 0);
-                } catch (Exception e) {
-                    log.error("Discord alarm execution failed: {}", e.getMessage(), e);
-                }
-            });
-        } catch (Exception e) {
-            log.error("Failed to schedule Discord webhook execution: {}", e.getMessage(), e);
+        // Queue the message for controlled delivery
+        WebhookTask task = new WebhookTask(message, hotDeal.title());
+        messageQueue.offer(task);
+        
+        // Start processing the queue if not already in progress
+        if (processingQueue.compareAndSet(false, true)) {
+            Schedulers.boundedElastic().schedule(this::processMessageQueue);
         }
         
-        // Return empty since we've manually triggered the execution
+        // Return empty since we've manually queued the execution
         return Mono.empty();
     }
     
-    private void sendWithRetry(WebhookEmbed embed, String title, int attemptCount) {
+    private void processMessageQueue() {
         try {
-            // Create a more explicit message with the embed
-            WebhookMessage message = new WebhookMessageBuilder()
-                .addEmbeds(embed)
-                .build();
-                
+            while (!messageQueue.isEmpty()) {
+                WebhookTask task = messageQueue.peek();
+                if (task != null) {
+                    // Acquire permit - blocks if we've hit the rate limit
+                    rateLimitSemaphore.acquire();
+                    
+                    // Remove from queue only after we've gotten a permit
+                    messageQueue.poll();
+                    
+                    try {
+                        sendWithRetry(task.message, task.title, 0);
+                    } catch (Exception e) {
+                        log.error("Discord alarm execution failed for '{}': {}", 
+                                task.title, e.getMessage(), e);
+                    }
+                    
+                    // Schedule semaphore release after delay to control rate
+                    Schedulers.boundedElastic().schedule(() -> {
+                        rateLimitSemaphore.release();
+                    }, rateLimitDelayMs, TimeUnit.MILLISECONDS);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error in message queue processor: {}", e.getMessage(), e);
+        } finally {
+            // Allow restart of queue processing if more messages arrive
+            processingQueue.set(false);
+            
+            // If messages were added while we were finishing, restart processing
+            if (!messageQueue.isEmpty() && processingQueue.compareAndSet(false, true)) {
+                Schedulers.boundedElastic().schedule(this::processMessageQueue);
+            }
+        }
+    }
+    
+    private void sendWithRetry(WebhookMessage message, String title, int attemptCount) {
+        try {
             // This sends synchronously but on a background thread via subscribeOn
             log.debug("Attempting to send Discord message for '{}' (attempt {}/{})", 
                     title, attemptCount + 1, retryAttempts);
                     
             webhookClient.send(message);
+            log.debug("Successfully sent Discord message for '{}'", title);
         } catch (Exception e) {
             log.error("Error sending Discord message (attempt {}/{}): {} - {}", 
                     attemptCount + 1, retryAttempts, e.getClass().getName(), e.getMessage(), e);
@@ -112,7 +166,7 @@ public class DiscordAlarmService implements AlarmService {
                     log.debug("Retrying Discord message in {}ms (attempt {})", 
                             delayMs, attemptCount + 2);
                     Thread.sleep(delayMs);
-                    sendWithRetry(embed, title, attemptCount + 1);
+                    sendWithRetry(message, title, attemptCount + 1);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     log.error("Retry was interrupted", ie);
@@ -157,5 +211,16 @@ public class DiscordAlarmService implements AlarmService {
         }
         // Show first 10 chars and last 5 chars
         return url.substring(0, 10) + "..." + url.substring(url.length() - 5);
+    }
+    
+    // Inner class to hold message data in the queue
+    private static class WebhookTask {
+        final WebhookMessage message;
+        final String title;
+        
+        WebhookTask(WebhookMessage message, String title) {
+            this.message = message;
+            this.title = title;
+        }
     }
 }

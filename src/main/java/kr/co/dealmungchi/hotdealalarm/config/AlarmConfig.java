@@ -24,10 +24,18 @@ public class AlarmConfig {
     @Value("${alarm.discord.timeout-ms:5000}")
     private int discordTimeoutMs;
     
+    @Value("${alarm.discord.rate-limit.delay-ms:500}")
+    private int discordRateLimitDelayMs;
+    
+    @Value("${alarm.discord.rate-limit.burst-size:5}")
+    private int discordRateLimitBurstSize;
+    
     @PostConstruct
     public void init() {
         log.info("Initialized alarm config with retry attempts: {}, retry delay: {}ms, timeout: {}ms", 
                 discordRetryAttempts, discordRetryDelayMs, discordTimeoutMs);
+        log.info("Discord rate limiting configured with delay: {}ms, burst size: {}", 
+                discordRateLimitDelayMs, discordRateLimitBurstSize);
         
         // Validate webhook URL
         if (discordWebhookUrl == null || discordWebhookUrl.isBlank() || !discordWebhookUrl.startsWith("https://discord.com/api/webhooks/")) {

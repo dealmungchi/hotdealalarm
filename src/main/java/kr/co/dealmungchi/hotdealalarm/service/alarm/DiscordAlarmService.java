@@ -191,9 +191,9 @@ public class DiscordAlarmService implements AlarmService {
         }
         builder.setFooter(new WebhookEmbed.EmbedFooter(footerText, null));
 
-        // Thumbnail field contains raw data, not a URL - can't be used with Discord webhook
-        // Discord requires image URLs, but we have raw image data
-        log.debug("Skipping thumbnail for hot deal: {}", hotDeal.title());
+        if (hotDeal.thumbnailLink() != null && !hotDeal.thumbnailLink().isBlank()) {
+            builder.setThumbnailUrl(hotDeal.thumbnailLink());
+        } 
 
         return builder.build();
     }

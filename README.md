@@ -43,7 +43,8 @@ Where `<hot-deal-json>` is a JSON object with the following structure:
   "title": "Product Title",
   "link": "https://example.com/product",
   "price": "10,000원",
-  "thumbnail": "<thumbnail-url-or-data>",
+  "thumbnail": "<thumbnail-data>",
+  "thumbnail_link": "<thumbnail-url>",
   "id": "12345",
   "posted_at": "YY/MM/DD",
   "provider": "Provider Name"

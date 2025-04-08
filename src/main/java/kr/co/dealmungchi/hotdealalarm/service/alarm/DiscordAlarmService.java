@@ -2,7 +2,6 @@ package kr.co.dealmungchi.hotdealalarm.service.alarm;
 
 import club.minnced.discord.webhook.WebhookClient;
 import club.minnced.discord.webhook.WebhookClientBuilder;
-import club.minnced.discord.webhook.receive.ReadonlyMessage;
 import club.minnced.discord.webhook.send.WebhookEmbed;
 import club.minnced.discord.webhook.send.WebhookEmbedBuilder;
 import club.minnced.discord.webhook.send.WebhookMessage;
@@ -63,7 +62,6 @@ public class DiscordAlarmService implements AlarmService {
         
         log.debug("Sending Discord alarm for deal: {}", hotDeal.title());
         
-        // Critical fix: We need to ensure this gets executed by subscribing immediately
         // Create the embed outside the reactive chain
         WebhookEmbed embed = createEmbed(hotDeal);
         

@@ -8,6 +8,9 @@ public record HotDealDto(
     String price,
     String thumbnail,
     
+    @JsonProperty("thumbnail_link")
+    String thumbnailLink,
+    
     @JsonProperty("id")
     String postId,
     
